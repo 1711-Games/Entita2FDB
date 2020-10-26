@@ -1,10 +1,10 @@
 import Foundation
 import XCTest
-import LGNCore
-import NIO
 import FDB
+import NIO
 import MessagePack
 import Entita2
+import Logging
 @testable import Entita2FDB
 
 final class Entita2FDBTests: XCTestCase {
@@ -15,7 +15,7 @@ final class Entita2FDBTests: XCTestCase {
             case email, country, invalidIndex
         }
 
-        static var storage: some E2FDBStorage = Entita2FDBTests.fdb
+        static var storage: some E2FDBStorage = fdb
         static var subspace: FDB.Subspace = Entita2FDBTests.subspace
         static var format: E2.Format = .JSON
         static var IDKey: KeyPath<Self, Identifier> = \.ID
@@ -30,7 +30,7 @@ final class Entita2FDBTests: XCTestCase {
         var country: String
     }
 
-    static var fdb: FDB!
+    static var fdb = FDB()
     static var subspace: FDB.Subspace!
     static var eventLoopGroup: EventLoopGroup!
     static var eventLoop: EventLoop {
@@ -52,7 +52,7 @@ final class Entita2FDBTests: XCTestCase {
         logger.logLevel = .debug
         FDB.logger = logger
         E2.logger = logger
-        self.fdb = FDB()
+        try! self.fdb.connect()
         self.subspace = FDB.Subspace("test \(Int.random(in: 0 ..< Int.max))")
         self.eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
     }
@@ -66,7 +66,6 @@ final class Entita2FDBTests: XCTestCase {
             XCTFail("Could not tearDown: \(error)")
         }
         self.fdb.disconnect()
-        self.fdb = nil
         try! self.eventLoopGroup.syncShutdownGracefully()
     }
 
@@ -79,24 +78,36 @@ final class Entita2FDBTests: XCTestCase {
         )
 
         XCTAssertNoThrow(
-            try TestEntity
+            try Self.fdb
                 .begin(on: Self.eventLoop)
-                .flatMap { (transaction: AnyTransaction?) -> Future<Void> in
-                    return instance1.insert(commit: true, within: transaction, on: Self.eventLoop)
+                .flatMap { transaction in
+                    instance1.insert(
+                        within: transaction,
+                        commit: true,
+                        on: Self.eventLoop
+                    )
                 }
                 .wait()
         )
         XCTAssertEqual(instance1, try TestEntity.load(by: id1, on: Self.eventLoop).wait())
         XCTAssertEqual(
             instance1,
-            try TestEntity.loadByIndex(key: .email, value: "jennie.pink@mephone.org.uk", on: Self.eventLoop).wait()
+            try TestEntity.loadByIndex(
+                key: .email,
+                value: "jennie.pink@mephone.org.uk",
+                on: Self.eventLoop
+            ).wait()
         )
 
         instance1.email = "bender@ilovebender.com"
         XCTAssertNoThrow(try instance1.save(on: Self.eventLoop).wait())
         XCTAssertEqual(
             instance1,
-            try TestEntity.loadByIndex(key: .email, value: "bender@ilovebender.com", on: Self.eventLoop).wait()
+            try TestEntity.loadByIndex(
+                key: .email,
+                value: "bender@ilovebender.com",
+                on: Self.eventLoop
+            ).wait()
         )
 
         try instance1.delete(on: Self.eventLoop).wait()
@@ -113,7 +124,7 @@ final class Entita2FDBTests: XCTestCase {
         let instance4 = TestEntity(ID: uuid4, email: self.email4, country: "KE")
 
         XCTAssertNoThrow(
-            try Future.andAllSucceed(
+            try EventLoopFuture.andAllSucceed(
                 [
                     instance1.insert(on: Self.eventLoop),
                     instance2.insert(on: Self.eventLoop),
@@ -164,7 +175,11 @@ final class Entita2FDBTests: XCTestCase {
             try TestEntity.loadAllByIndex(key: .country, value: "RU", on: Self.eventLoop).wait()
         )
 
-        var instance4_1 = try TestEntity.loadByIndex(key: .email, value: self.email4, on: Self.eventLoop).wait()
+        var instance4_1 = try TestEntity.loadByIndex(
+            key: .email,
+            value: self.email4,
+            on: Self.eventLoop
+        ).wait()
         XCTAssertNotNil(instance4_1)
         instance4_1!.email = "kek"
         try instance4_1!.save(on: Self.eventLoop).wait()
@@ -196,9 +211,13 @@ final class Entita2FDBTests: XCTestCase {
                     }
                     return (entity, transaction)
                 }
-                .flatMap { (entity: TestEntity, transaction: AnyFDBTransaction) -> Future<TestEntity?> in
+                .flatMap { (entity: TestEntity, transaction: AnyFDBTransaction) -> EventLoopFuture<TestEntity?> in
                     entity
-                        .delete(commit: false, within: transaction as? AnyTransaction, on: Self.eventLoop)
+                        .delete(
+                            within: transaction as? AnyTransaction,
+                            commit: false,
+                            on: Self.eventLoop
+                        )
                         .flatMap {
                             transaction.reset()
 
@@ -216,20 +235,46 @@ final class Entita2FDBTests: XCTestCase {
 
     func testExistsByIndex() throws {
         let email = "foo@bar.baz"
-        XCTAssertFalse(try TestEntity.existsByIndex(key: .email, value: email, on: Self.eventLoop).wait())
+        XCTAssertFalse(
+            try TestEntity.existsByIndex(key: .email, value: email, on: Self.eventLoop).wait()
+        )
         try TestEntity(ID: .init(), email: email, country: "RU").save(on: Self.eventLoop).wait()
-        XCTAssertTrue(try TestEntity.existsByIndex(key: .email, value: email, on: Self.eventLoop).wait())
-        let instance = try TestEntity.loadByIndex(key: .email, value: email, on: Self.eventLoop).wait()
+        XCTAssertTrue(
+            try TestEntity.existsByIndex(key: .email, value: email, on: Self.eventLoop).wait()
+        )
+        let instance = try TestEntity.loadByIndex(
+            key: .email,
+            value: email,
+            on: Self.eventLoop
+        ).wait()
         XCTAssertNotNil(instance)
         try instance!.delete(on: Self.eventLoop).wait()
-        XCTAssertFalse(try TestEntity.existsByIndex(key: .email, value: email, on: Self.eventLoop).wait())
+        XCTAssertFalse(
+            try TestEntity.existsByIndex(key: .email, value: email, on: Self.eventLoop).wait()
+        )
     }
 
     func testInvalidIndex() throws {
-        XCTAssertEqual(false, try TestEntity.existsByIndex(key: .invalidIndex, value: "lul", on: Self.eventLoop).wait())
-        XCTAssertEqual([], try TestEntity.loadAllByIndex(key: .invalidIndex, value: "lul", on: Self.eventLoop).wait())
-        XCTAssertEqual(nil, try TestEntity.loadByIndex(key: .invalidIndex, value: "lul", on: Self.eventLoop).wait())
-        XCTAssertEqual(nil, try TestEntity.loadByIndex(key: .email, value: "lul", on: Self.eventLoop).wait())
+        XCTAssertEqual(
+            false,
+            try TestEntity.existsByIndex(key: .invalidIndex, value: "lul", on: Self.eventLoop).wait()
+        )
+        XCTAssertEqual(
+            [],
+            try TestEntity.loadAllByIndex(
+                key: .invalidIndex,
+                value: "lul",
+                on: Self.eventLoop
+            ).wait()
+        )
+        XCTAssertEqual(
+            nil,
+            try TestEntity.loadByIndex(key: .invalidIndex, value: "lul", on: Self.eventLoop).wait()
+        )
+        XCTAssertEqual(
+            nil,
+            try TestEntity.loadByIndex(key: .email, value: "lul", on: Self.eventLoop).wait()
+        )
     }
 
     func testDoesRelateToThis() throws {
