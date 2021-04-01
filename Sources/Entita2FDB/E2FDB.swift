@@ -1,6 +1,5 @@
 import Entita2
 import FDB
-import NIO
 
 public protocol Entita2FDBEntity: Entita2Entity where Identifier: FDBTuplePackable, Storage: Entita2FDBStorage {
     /// Root application FDB Subspace — `/[root_subspace]`
@@ -44,42 +43,23 @@ public extension Entita2FDBEntity {
         self.subspace[self.entityName]
     }
 
-    /// Tries to load an entity for given ID within a newly started transaction
-    @inlinable
-    static func loadWithTransaction(
-        by ID: Identifier,
-        snapshot: Bool,
-        on eventLoop: EventLoop
-    ) -> EventLoopFuture<(Self?, AnyFDBTransaction)> {
-        Self.storage.withTransaction(on: eventLoop) { transaction in
-            Self
-                .load(by: ID, within: transaction, snapshot: snapshot, on: eventLoop)
-                .map { ($0, transaction) }
-        }
-    }
-
     /// Tries to load an entity for given ID within a given transaction (optional)
     @inlinable
     static func load(
         by ID: Identifier,
         within transaction: AnyFDBTransaction? = nil,
-        snapshot: Bool,
-        on eventLoop: EventLoop
-    ) -> EventLoopFuture<Self?> {
-        Self.storage
-            .load(
-                by: Self.IDAsKey(ID: ID),
-                within: transaction,
-                snapshot: snapshot,
-                on: eventLoop
-            )
-            .flatMap { (maybeBytes: Bytes?) -> EventLoopFuture<Self?> in
-                self.afterLoadRoutines0(
-                    maybeBytes: maybeBytes,
-                    within: transaction as? AnyTransaction,
-                    on: eventLoop
-                )
-            }
+        snapshot: Bool
+    ) async throws -> Self? {
+        let maybeBytes = try await Self.storage.load(
+            by: Self.IDAsKey(ID: ID),
+            within: transaction,
+            snapshot: snapshot
+        )
+        
+        return try await self.afterLoadRoutines0(
+            maybeBytes: maybeBytes,
+            within: transaction as? AnyTransaction
+        )
     }
 
     /// Loads all entities in given subspace within a given transaction (optional)
@@ -88,23 +68,21 @@ public extension Entita2FDBEntity {
         bySubspace subspace: FDB.Subspace,
         limit: Int32 = 0,
         within transaction: AnyFDBTransaction? = nil,
-        snapshot: Bool,
-        on eventLoop: EventLoop
-    ) -> EventLoopFuture<[(ID: Self.Identifier, value: Self)]> {
-        Self.storage.loadAll(
+        snapshot: Bool
+    ) async throws -> [(ID: Self.Identifier, value: Self)] {
+        let results = try await Self.storage.loadAll(
             by: subspace.range,
             limit: limit,
             within: transaction,
-            snapshot: snapshot,
-            on: eventLoop
-        ).flatMapThrowing { results in
-            try results.records.map {
-                let instance = try Self(from: $0.value)
-                return (
-                    ID: instance.getID(),
-                    value: instance
-                )
-            }
+            snapshot: snapshot
+        )
+
+        return try results.records.map {
+            let instance = try Self(from: $0.value)
+            return (
+                ID: instance.getID(),
+                value: instance
+            )
         }
     }
 
@@ -113,15 +91,13 @@ public extension Entita2FDBEntity {
     static func loadAll(
         limit: Int32 = 0,
         within transaction: AnyFDBTransaction? = nil,
-        snapshot: Bool,
-        on eventLoop: EventLoop
-    ) -> EventLoopFuture<[(ID: Self.Identifier, value: Self)]> {
-        Self.loadAll(
+        snapshot: Bool
+    ) async throws -> [(ID: Self.Identifier, value: Self)] {
+        try await Self.loadAll(
             bySubspace: Self.subspacePrefix,
             limit: limit,
             within: transaction,
-            snapshot: snapshot,
-            on: eventLoop
+            snapshot: snapshot
         )
     }
 
@@ -131,15 +107,13 @@ public extension Entita2FDBEntity {
         by key: AnyFDBKey,
         limit: Int32 = 0,
         within transaction: AnyFDBTransaction? = nil,
-        snapshot: Bool,
-        on eventLoop: EventLoop
-    ) -> EventLoopFuture<[(ID: Self.Identifier, value: Self)]> {
-        Self.loadAll(
+        snapshot: Bool
+    ) async throws -> [(ID: Self.Identifier, value: Self)] {
+        try await Self.loadAll(
             bySubspace: Self.subspacePrefix[key],
             limit: limit,
             within: transaction,
-            snapshot: snapshot,
-            on: eventLoop
+            snapshot: snapshot
         )
     }
 
@@ -152,46 +126,32 @@ public extension Entita2FDBEntity {
         mode _: FDB.StreamingMode = .wantAll,
         iteration _: Int32 = 1,
         within transaction: AnyFDBTransaction? = nil,
-        snapshot: Bool,
-        on eventLoop: EventLoop
-    ) -> EventLoopFuture<FDB.KeyValuesResult> {
-        Self.storage.loadAll(
+        snapshot: Bool
+    ) async throws -> FDB.KeyValuesResult {
+        try await Self.storage.loadAll(
             by: Self.subspacePrefix.range,
             limit: limit,
             within: transaction,
-            snapshot: snapshot,
-            on: eventLoop
+            snapshot: snapshot
         )
     }
 
     /// Inserts current entity to DB within given transaction
     @inlinable
-    func insert(
-        within transaction: AnyFDBTransaction?,
-        commit: Bool = true,
-        on eventLoop: EventLoop
-    ) -> EventLoopFuture<Void> {
-        self.insert(within: transaction as? AnyTransaction, commit: commit, on: eventLoop)
+    func insert(within transaction: AnyFDBTransaction?, commit: Bool = true) async throws {
+        try await self.insert(within: transaction as? AnyTransaction, commit: commit)
     }
 
     /// Saves current entity to DB within given transaction
     @inlinable
     func save(
-        by ID: Identifier? = nil,
-        within transaction: AnyFDBTransaction?,
-        commit: Bool = true,
-        on eventLoop: EventLoop
-    ) -> EventLoopFuture<Void> {
-        self.save(by: ID, within: transaction as? AnyTransaction, commit: commit, on: eventLoop)
+        by ID: Identifier? = nil, within transaction: AnyFDBTransaction?, commit: Bool = true) async throws {
+        try await self.save(by: ID, within: transaction as? AnyTransaction, commit: commit)
     }
 
     /// Deletes current entity from DB within given transaction
     @inlinable
-    func delete(
-        within transaction: AnyFDBTransaction?,
-        commit: Bool = true,
-        on eventLoop: EventLoop
-    ) -> EventLoopFuture<Void> {
-        self.delete(within: transaction as? AnyTransaction, commit: commit, on: eventLoop)
+    func delete(within transaction: AnyFDBTransaction?, commit: Bool = true) async throws {
+        try await self.delete(within: transaction as? AnyTransaction, commit: commit)
     }
 }
