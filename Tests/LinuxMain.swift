@@ -1,7 +1,10 @@
 import XCTest
-
 import Entita2FDBTests
 
-var tests = [XCTestCaseEntry]()
-tests += Entita2FDBTests.allTests()
-XCTMain(tests)
+@main public struct Main {
+    public static func main() {
+        var tests = [XCTestCaseEntry]()
+        tests += Entita2FDBTests.__allTests()
+        XCTMain(tests)
+    }
+}

@@ -1,0 +1,28 @@
+name: Entita2FDB
+
+on:
+  pull_request:
+    branches:
+    - master
+
+jobs:
+  test:
+
+    runs-on: ubuntu-latest
+    strategy:
+      max-parallel: 4
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Run tests
+      run: |
+        eval "$(curl -sL https://swiftenv.fuller.li/install.sh)"
+        sudo apt-get install -y wget
+        wget https://www.foundationdb.org/downloads/6.2.22/ubuntu/installers/foundationdb-clients_6.2.22-1_amd64.deb
+        wget https://www.foundationdb.org/downloads/6.2.22/ubuntu/installers/foundationdb-server_6.2.22-1_amd64.deb
+        sudo dpkg -i foundationdb-clients_6.2.22-1_amd64.deb foundationdb-server_6.2.22-1_amd64.deb
+        sudo service foundationdb start
+        git clone https://github.com/kirilltitov/FDBSwift.git
+        chmod +x FDBSwift/scripts/install_pkgconfig.sh
+        sudo ./FDBSwift/scripts/install_pkgconfig.sh
+        swift test
