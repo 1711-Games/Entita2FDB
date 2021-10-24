@@ -103,17 +103,13 @@ final class Entita2FDBTests: XCTestCase {
 
     override class func setUp() {
         super.setUp()
-        var logger = Logger(label: "testlogger")
-        logger.logLevel = .debug
-        FDB.logger = logger
-        E2.logger = logger
         try! self.fdb.connect()
         self.subspace = FDB.Subspace("test \(Int.random(in: 0 ..< Int.max))")
     }
 
     override class func tearDown() {
         super.tearDown()
-        FDB.logger.notice("Cleanup")
+        Logger.current.notice("Cleanup")
         // do {
         //     try self.fdb.clear(subspace: self.subspace)
         // } catch {
