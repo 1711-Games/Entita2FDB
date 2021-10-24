@@ -1,5 +1,5 @@
 import FDB
-import Logging
+import LGNLog
 
 public typealias E2FDBIndexedEntity = Entita2FDBIndexedEntity
 
@@ -176,7 +176,7 @@ public extension Entita2FDBIndexedEntity {
             )
         }
 
-        Entita2.logger.debug("Creating \(index.unique ? "unique " : "")index '\(key.rawValue)' with value '\(value)'")
+        Logger.current.debug("Creating \(index.unique ? "unique " : "")index '\(key.rawValue)' with value '\(value)'")
 
         let transaction = try await Self.storage.unwrapAnyTransactionOrBegin(maybeTransaction)
         transaction.set(key: self.getIndexKeyForIndex(index, key: key, value: value), value: self.getIDAsKey())
@@ -184,7 +184,7 @@ public extension Entita2FDBIndexedEntity {
     }
 
     func afterInsert0(within transaction: AnyTransaction?) async throws {
-        Entita2.logger.debug("Creating indices \(Self.indices.keys.map { $0.rawValue }) for entity '\(self.getID())'")
+        Logger.current.debug("Creating indices \(Self.indices.keys.map { $0.rawValue }) for entity '\(self.getID())'")
 
         for (key, index) in Self.indices {
             try await self.createIndex(
@@ -241,11 +241,11 @@ public extension Entita2FDBIndexedEntity {
                 )
             }
             guard let key = IndexKey(rawValue: keyName) else {
-                Entita2.logger.debug("Unknown index '\(keyName)' in entity '\(Self.entityName)', skipping")
+                Logger.current.debug("Unknown index '\(keyName)' in entity '\(Self.entityName)', skipping")
                 continue
             }
             guard let index = Self.indices[key] else {
-                Entita2.logger.debug("No index '\(key)' in entity '\(Self.entityName)', skipping")
+                Logger.current.debug("No index '\(key)' in entity '\(Self.entityName)', skipping")
                 continue
             }
             guard let propertyValue = self.getIndexValueFrom(index: index) else {

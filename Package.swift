@@ -9,8 +9,9 @@ let package = Package(
         .library(name: "Entita2FDB", targets: ["Entita2FDB"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/1711-Games/Entita2.git", .upToNextMajor(from: "1.0.0-RC-2")),
-        .package(url: "https://github.com/kirilltitov/FDBSwift.git", .upToNextMajor(from: "5.0.0-RC-1")),
+        .package(url: "https://github.com/1711-Games/Entita2.git", from: "1.0.0"),
+        .package(url: "https://github.com/kirilltitov/FDBSwift.git", .upToNextMajor(from: "5.0.0-RC-2")),
+        .package(url: "https://github.com/1711-Games/LGN-Log.git", .upToNextMinor(from: "0.2.0")),
     ],
     targets: [
         .target(
@@ -18,6 +19,7 @@ let package = Package(
             dependencies: [
                 .product(name: "Entita2", package: "Entita2"),
                 .product(name: "FDB", package: "FDBSwift"),
+                .product(name: "LGNLog", package: "LGN-Log"),
             ]
         ),
         .testTarget(name: "Entita2FDBTests", dependencies: ["Entita2FDB"]),
