@@ -1,4 +1,5 @@
 import FDB
+import LGNLog
 
 public typealias E2FDBStorage = Entita2FDBStorage
 
@@ -45,7 +46,7 @@ extension FDB: Entita2FDBStorage {
         if let transaction = anyTransaction {
             return transaction
         } else {
-            Entita2.logger.debug("Beginning a new transaction")
+            Logger.current.debug("Beginning a new transaction")
             return try self.begin()
         }
     }
