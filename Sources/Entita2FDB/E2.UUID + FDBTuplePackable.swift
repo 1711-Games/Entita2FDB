@@ -3,7 +3,7 @@ import FDB
 
 extension Entita2.ID: FDBTuplePackable where Value == UUID {
     @inlinable
-    public func pack() -> Bytes {
-        self._bytes.pack()
+    public func getPackedFDBTupleValue() -> Bytes {
+        self._bytes.getPackedFDBTupleValue()
     }
 }
