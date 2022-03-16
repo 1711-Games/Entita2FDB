@@ -54,6 +54,18 @@ final class Entita2FDBTests: XCTestCase {
         self.fdb.disconnect()
     }
 
+    private func cleanup() async throws {
+        try await Self.fdb.clear(subspace: Self.subspace)
+    }
+
+    override func setUp() async throws {
+        try await self.cleanup()
+    }
+
+    override func tearDown() async throws {
+        try await self.cleanup()
+    }
+
     func testGeneric() async throws {
         let id1 = E2.UUID()
         var instance1 = TestEntity(
