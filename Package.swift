@@ -10,7 +10,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/1711-Games/Entita2.git", from: "1.0.0"),
-        .package(url: "https://github.com/kirilltitov/FDBSwift.git", .upToNextMajor(from: "5.0.0-RC-4")),
+        .package(url: "https://github.com/kirilltitov/FDBSwift.git", .upToNextMajor(from: "5.0.0-RC-7")),
         .package(url: "https://github.com/1711-Games/LGN-Log.git", .upToNextMinor(from: "0.4.0")),
     ],
     targets: [
