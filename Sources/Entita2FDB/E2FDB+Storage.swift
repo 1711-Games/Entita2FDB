@@ -1,48 +1,53 @@
+import Entita2
 import FDB
 import LGNLog
 
 public typealias E2FDBStorage = Entita2FDBStorage
 
-public protocol Entita2FDBStorage: Entita2Storage, AnyFDB {
-    /// Unwraps a given optional `AnyFDBTransaction` transaction into a non-optional transaction or begins a new one
-    func unwrapAnyTransactionOrBegin(_ anyTransaction: AnyFDBTransaction?) async throws -> AnyFDBTransaction
+extension Entita2Storage where Self == FDB.Connector {
+    
+}
+
+public protocol Entita2FDBStorage: Entita2Storage, FDBConnector {
+    /// Unwraps a given optional `any FDBTransaction` transaction into a non-optional transaction or begins a new one
+    func unwrapAnyTransactionOrBegin(_ anyTransaction: (any FDBTransaction)?) async throws -> any FDBTransaction
 
     /// Commits a given transaction if `commit` is `true`
-    func commitIfNecessary(transaction: AnyFDBTransaction, commit: Bool) async throws
+    func commitIfNecessary(transaction: any FDBTransaction, commit: Bool) async throws
 
     /// Tries to load a value from FDB by given key within a given optional transaction
-    func load(by key: Bytes, within transaction: AnyFDBTransaction?) async throws -> Bytes?
+    func load(by key: Bytes, within transaction: (any FDBTransaction)?) async throws -> Bytes?
 
     /// Tries to load a value from FDB by given key within a given optional transaction (uses snapshot)
-    func load(by key: Bytes, within transaction: AnyFDBTransaction?, snapshot: Bool) async throws -> Bytes?
+    func load(by key: Bytes, within transaction: (any FDBTransaction)?, snapshot: Bool) async throws -> Bytes?
 
     /// Loads all values from FDB by given range key within a given optional transaction
-    func loadAll(by range: FDB.RangeKey, limit: Int32, within transaction: AnyFDBTransaction?) async throws -> FDB.KeyValuesResult
+    func loadAll(by range: FDB.RangeKey, limit: Int32, within transaction: (any FDBTransaction)?) async throws -> FDB.KeyValuesResult
 
     /// Loads all values from FDB by given range key within a given optional transaction (uses snapshot)
     func loadAll(
         by range: FDB.RangeKey,
         limit: Int32,
-        within transaction: AnyFDBTransaction?,
+        within transaction: (any FDBTransaction)?,
         snapshot: Bool
     ) async throws -> FDB.KeyValuesResult
 
     /// Saves given bytes in FDB at given key within an optional transaction
-    func save(bytes: Bytes, by key: Bytes, within transaction: AnyFDBTransaction?) async throws
+    func save(bytes: Bytes, by key: Bytes, within transaction: (any FDBTransaction)?) async throws
 
     /// Deletes a value from FDB at given key within an optional transaction
-    func delete(by key: Bytes, within transaction: AnyFDBTransaction?) async throws
+    func delete(by key: Bytes, within transaction: (any FDBTransaction)?) async throws
 }
 
-extension FDB: Entita2FDBStorage {
-    public func begin() throws -> AnyTransaction {
-        let transaction: AnyFDBTransaction = try self.begin()
-        return transaction as! AnyTransaction
+extension FDB.Connector: Entita2FDBStorage {
+    public func begin() throws -> any Entita2Transaction {
+        let transaction: any FDBTransaction = try self.begin()
+        return transaction as! Entita2Transaction
     }
 
     // MARK: - Entita2FDBStorage compatibility layer
     @inlinable
-    public func unwrapAnyTransactionOrBegin(_ anyTransaction: AnyFDBTransaction?) throws -> AnyFDBTransaction {
+    public func unwrapAnyTransactionOrBegin(_ anyTransaction: (any FDBTransaction)?) throws -> any FDBTransaction {
         if let transaction = anyTransaction {
             return transaction
         } else {
@@ -52,17 +57,17 @@ extension FDB: Entita2FDBStorage {
     }
 
     @inlinable
-    public func commitIfNecessary(transaction: AnyFDBTransaction, commit: Bool) async throws {
+    public func commitIfNecessary(transaction: any FDBTransaction, commit: Bool) async throws {
         if commit {
             try await transaction.commit()
         }
     }
 
-    public func load(by key: Bytes, within transaction: AnyFDBTransaction?) async throws -> Bytes? {
+    public func load(by key: Bytes, within transaction: (any FDBTransaction)?) async throws -> Bytes? {
         try await self.load(by: key, within: transaction, snapshot: false)
     }
 
-    public func load(by key: Bytes, within maybeTransaction: AnyFDBTransaction?, snapshot: Bool) async throws -> Bytes? {
+    public func load(by key: Bytes, within maybeTransaction: (any FDBTransaction)?, snapshot: Bool) async throws -> Bytes? {
         try await self
             .unwrapAnyTransactionOrBegin(maybeTransaction)
             .get(key: key, snapshot: snapshot)
@@ -71,7 +76,7 @@ extension FDB: Entita2FDBStorage {
     public func loadAll(
         by range: FDB.RangeKey,
         limit: Int32 = 0,
-        within transaction: AnyFDBTransaction?
+        within transaction: (any FDBTransaction)?
     ) async throws -> FDB.KeyValuesResult {
         try await self.loadAll(by: range, limit: limit, within: transaction, snapshot: false)
     }
@@ -79,7 +84,7 @@ extension FDB: Entita2FDBStorage {
     public func loadAll(
         by range: FDB.RangeKey,
         limit: Int32 = 0,
-        within maybeTransaction: AnyFDBTransaction?,
+        within maybeTransaction: (any FDBTransaction)?,
         snapshot: Bool
     ) async throws -> FDB.KeyValuesResult {
         try await self
@@ -87,13 +92,13 @@ extension FDB: Entita2FDBStorage {
             .get(range: range, limit: limit, snapshot: snapshot)
     }
 
-    public func save(bytes: Bytes, by key: Bytes, within maybeTransaction: AnyFDBTransaction?) async throws {
+    public func save(bytes: Bytes, by key: Bytes, within maybeTransaction: (any FDBTransaction)?) async throws {
         let transaction = try self.unwrapAnyTransactionOrBegin(maybeTransaction)
         transaction.set(key: key, value: bytes)
         try await self.commitIfNecessary(transaction: transaction, commit: maybeTransaction == nil)
     }
 
-    public func delete(by key: Bytes, within maybeTransaction: AnyFDBTransaction?) async throws {
+    public func delete(by key: Bytes, within maybeTransaction: (any FDBTransaction)?) async throws {
         let transaction = try self.unwrapAnyTransactionOrBegin(maybeTransaction)
         transaction.clear(key: key)
         try await self.commitIfNecessary(transaction: transaction, commit: maybeTransaction == nil)
@@ -101,15 +106,15 @@ extension FDB: Entita2FDBStorage {
 
     // MARK: - Entita2Storage compatibility layer
 
-    public func load(by key: Bytes, within transaction: AnyTransaction?) async throws -> Bytes? {
-        try await self.load(by: key, within: transaction as? AnyFDBTransaction, snapshot: false)
+    public func load(by key: Bytes, within transaction: (any Entita2Transaction)?) async throws -> Bytes? {
+        try await self.load(by: key, within: transaction as? any FDBTransaction, snapshot: false)
     }
 
-    public func save(bytes: Bytes, by key: Bytes, within tr: AnyTransaction?) async throws {
-        try await self.save(bytes: bytes, by: key, within: tr as? AnyFDBTransaction)
+    public func save(bytes: Bytes, by key: Bytes, within tr: (any Entita2Transaction)?) async throws {
+        try await self.save(bytes: bytes, by: key, within: tr as? any FDBTransaction)
     }
 
-    public func delete(by key: Bytes, within transaction: AnyTransaction?) async throws {
-        try await self.delete(by: key, within: transaction as? AnyFDBTransaction)
+    public func delete(by key: Bytes, within transaction: (any Entita2Transaction)?) async throws {
+        try await self.delete(by: key, within: transaction as? any FDBTransaction)
     }
 }

@@ -7,14 +7,20 @@ import Logging
 @testable import Entita2FDB
 
 final class Entita2FDBTests: XCTestCase {
+    static var fdb: FDB.Connector = FDB.Connector()
+    static var subspace: FDB.Subspace!
+
     struct TestEntity: E2FDBIndexedEntity, Equatable {
+        static var storage = fdb
+
+        //static var storage: any Entita2FDBStorage = fdb
+
         typealias Identifier = E2.UUID
 
         public enum IndexKey: String, AnyIndexKey {
             case email, country, invalidIndex
         }
 
-        static var storage: some E2FDBStorage = fdb
         static var subspace: FDB.Subspace = Entita2FDBTests.subspace
         static var format: E2.Format = .JSON
         static var IDKey: KeyPath<Self, Identifier> = \.ID
@@ -28,9 +34,6 @@ final class Entita2FDBTests: XCTestCase {
         var email: String
         var country: String
     }
-
-    static var fdb = FDB()
-    static var subspace: FDB.Subspace!
 
     let email1 = "foo"
     let email2 = "bar"
@@ -74,7 +77,7 @@ final class Entita2FDBTests: XCTestCase {
             country: "UK"
         )
 
-        let transaction: AnyFDBTransaction = try Self.fdb.begin()
+        let transaction: any FDBTransaction = try Self.fdb.begin()
         try await instance1.insert(within: transaction, commit: true)
         let actual1 = try await TestEntity.load(by: id1)
         XCTAssertEqual(instance1, actual1)
@@ -166,7 +169,7 @@ final class Entita2FDBTests: XCTestCase {
         let instance1 = TestEntity(ID: .init(), email: "foo", country: "UA")
         try await instance1.save()
 
-        let transaction: AnyFDBTransaction = try Self.fdb.begin()
+        let transaction: any FDBTransaction = try Self.fdb.begin()
 
         let maybeEntity = try await TestEntity.load(by: instance1.ID, within: transaction, snapshot: false)
         guard let entity = maybeEntity else {

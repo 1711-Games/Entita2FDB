@@ -1,4 +1,5 @@
 import FDB
+import Entita2
 import LGNLog
 
 public typealias E2FDBIndexedEntity = Entita2FDBIndexedEntity
@@ -95,19 +96,19 @@ public protocol Entita2FDBIndexedEntity: Entita2FDBEntity {
     var indexIndexSubspace: FDB.Subspace { get }
 
     /// Returns an FDB key for storing index data (_index for index_) for given `index`, `key` index name and index `value`
-    func getIndexKeyForIndex(_ index: E2.Index<Self>, key: IndexKey, value: FDBTuplePackable) -> AnyFDBKey
+    func getIndexKeyForIndex(_ index: E2.Index<Self>, key: IndexKey, value: FDBTuplePackable) -> any FDBKey
 
     /// Returns an FDB key for storing index for index data for given `index`, `key` index name and index `value`
-    func getIndexIndexKeyForIndex(key: IndexKey, value: FDBTuplePackable) -> AnyFDBKey
+    func getIndexIndexKeyForIndex(key: IndexKey, value: FDBTuplePackable) -> any FDBKey
 
     /// Returns an FDB key for storing unique index data for given `key` index name and index `value`
-    static func getIndexKeyForUniqueIndex(key: IndexKey, value: FDBTuplePackable) -> AnyFDBKey
+    static func getIndexKeyForUniqueIndex(key: IndexKey, value: FDBTuplePackable) -> any FDBKey
 
     /// Tries to load an entity for given unique index `key` and `value`. Optionally a `transaction` may be passed.
     static func loadByIndex(
         key: IndexKey,
         value: FDBTuplePackable,
-        within transaction: AnyFDBTransaction?
+        within transaction: (any FDBTransaction)?
     ) async throws -> Self?
 
     /// Loads all entities for given non-unique index `key` and `value`.
@@ -115,7 +116,7 @@ public protocol Entita2FDBIndexedEntity: Entita2FDBEntity {
         key: IndexKey,
         value: FDBTuplePackable,
         limit: Int32,
-        within transaction: AnyFDBTransaction?,
+        within transaction: (any FDBTransaction)?,
         snapshot: Bool
     ) async throws -> [Self]
 
@@ -123,7 +124,7 @@ public protocol Entita2FDBIndexedEntity: Entita2FDBEntity {
     static func existsByIndex(
         key: IndexKey,
         value: FDBTuplePackable,
-        within transaction: AnyFDBTransaction?
+        within transaction: (any FDBTransaction)?
     ) async throws -> Bool
 }
 
@@ -146,11 +147,11 @@ public extension Entita2FDBIndexedEntity {
         Self.indexSubspace[key.rawValue][value]
     }
 
-    static func getIndexKeyForUniqueIndex(key: IndexKey, value: FDBTuplePackable) -> AnyFDBKey {
+    static func getIndexKeyForUniqueIndex(key: IndexKey, value: FDBTuplePackable) -> any FDBKey {
         Self.getGenericIndexSubspaceForIndex(key: key, value: value)
     }
 
-    func getIndexKeyForIndex(_ index: E2.Index<Self>, key: IndexKey, value: FDBTuplePackable) -> AnyFDBKey {
+    func getIndexKeyForIndex(_ index: E2.Index<Self>, key: IndexKey, value: FDBTuplePackable) -> any FDBKey {
         var result = Self.getGenericIndexSubspaceForIndex(key: key, value: value)
 
         if !index.unique {
@@ -160,7 +161,7 @@ public extension Entita2FDBIndexedEntity {
         return result
     }
 
-    func getIndexIndexKeyForIndex(key: IndexKey, value: FDBTuplePackable) -> AnyFDBKey {
+    func getIndexIndexKeyForIndex(key: IndexKey, value: FDBTuplePackable) -> any FDBKey {
         self.indexIndexSubspace[key.rawValue][value]
     }
 
@@ -168,7 +169,7 @@ public extension Entita2FDBIndexedEntity {
     private func createIndex(
         key: IndexKey,
         index: E2.Index<Self>,
-        within maybeTransaction: AnyFDBTransaction?
+        within maybeTransaction: (any FDBTransaction)?
     ) async throws {
         guard let value = self.getIndexValueFrom(index: index) else {
             throw Entita2.E.IndexError(
@@ -183,20 +184,20 @@ public extension Entita2FDBIndexedEntity {
         transaction.set(key: self.getIndexIndexKeyForIndex(key: key, value: value), value: [])
     }
 
-    func afterInsert0(within transaction: AnyTransaction?) async throws {
+    func afterInsert0(within transaction: (any Entita2Transaction)?) async throws {
         Logger.current.debug("Creating indices \(Self.indices.keys.map { $0.rawValue }) for entity '\(self.getID())'")
 
         for (key, index) in Self.indices {
             try await self.createIndex(
                 key: key,
                 index: index,
-                within: transaction as? AnyFDBTransaction
+                within: transaction as? any FDBTransaction
             )
         }
     }
 
-    func beforeDelete0(within tr: AnyTransaction?) async throws {
-        let transaction = try await Self.storage.unwrapAnyTransactionOrBegin(tr as? AnyFDBTransaction)
+    func beforeDelete0(within tr: (any Entita2Transaction)?) async throws {
+        let transaction = try await Self.storage.unwrapAnyTransactionOrBegin(tr as? any FDBTransaction)
         guard let entity = try await Self.load(by: self.getID(), within: transaction, snapshot: false) else {
             throw Entita2.E.IndexError(
                 """
@@ -217,7 +218,7 @@ public extension Entita2FDBIndexedEntity {
     }
 
     /// Updates all indices (if updated) of current entity within an optional transaction
-    fileprivate func updateIndices(within maybeTransaction: AnyFDBTransaction?) async throws {
+    fileprivate func updateIndices(within maybeTransaction: (any FDBTransaction)?) async throws {
         let transaction = try await Self.storage.unwrapAnyTransactionOrBegin(maybeTransaction)
 
         // todo task group
@@ -263,11 +264,11 @@ public extension Entita2FDBIndexedEntity {
             }
         }
 
-        try await self.afterInsert0(within: transaction as? AnyTransaction)
+        try await self.afterInsert0(within: transaction as? any Entita2Transaction)
     }
 
-    func afterSave0(within transaction: AnyTransaction?) async throws {
-        try await self.updateIndices(within: transaction as? AnyFDBTransaction)
+    func afterSave0(within transaction: (any Entita2Transaction)?) async throws {
+        try await self.updateIndices(within: transaction as? any FDBTransaction)
     }
 
     /// Returns true if given index `key` is defined in indices schema
@@ -285,7 +286,7 @@ public extension Entita2FDBIndexedEntity {
         key: IndexKey,
         value: FDBTuplePackable,
         limit: Int32 = 0,
-        within tr: AnyFDBTransaction? = nil,
+        within tr: (any FDBTransaction)? = nil,
         snapshot: Bool = false
     ) async throws -> [Self] {
         guard Self.isValidIndex(key: key) else {
@@ -302,7 +303,7 @@ public extension Entita2FDBIndexedEntity {
         var result: [Self] = []
 
         for record in results.records {
-            if let value = try await Self.loadByRaw(IDBytes: record.value, within: transaction as? AnyTransaction) {
+            if let value = try await Self.loadByRaw(IDBytes: record.value, within: transaction as? any Entita2Transaction) {
                 result.append(value)
             }
         }
@@ -313,7 +314,7 @@ public extension Entita2FDBIndexedEntity {
     static func loadByIndex(
         key: IndexKey,
         value: FDBTuplePackable,
-        within maybeTransaction: AnyFDBTransaction? = nil
+        within maybeTransaction: (any FDBTransaction)? = nil
     ) async throws -> Self? {
         guard Self.isValidIndex(key: key) else {
             return nil
@@ -327,14 +328,14 @@ public extension Entita2FDBIndexedEntity {
 
         return try await Self.loadByRaw(
             IDBytes: IDBytes,
-            within: transaction as? AnyTransaction
+            within: transaction as? any Entita2Transaction
         )
     }
 
     static func existsByIndex(
         key: IndexKey,
         value: FDBTuplePackable,
-        within maybeTransaction: AnyFDBTransaction? = nil
+        within maybeTransaction: (any FDBTransaction)? = nil
     ) async throws -> Bool {
         guard Self.isValidIndex(key: key) else {
             return false

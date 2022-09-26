@@ -6,8 +6,8 @@ public protocol Entita2FDBEntity: Entita2Entity where Identifier: FDBTuplePackab
     static var subspace: FDB.Subspace { get }
 }
 
-extension FDB.Transaction: AnyTransaction {}
-extension AnyFDBTransaction where Self: AnyTransaction {}
+extension FDB.Transaction: Entita2Transaction {}
+extension FDBTransaction where Self: Entita2Transaction {}
 
 public typealias E2FDBEntity = Entita2FDBEntity
 
@@ -47,10 +47,10 @@ public extension Entita2FDBEntity {
     @inlinable
     static func load(
         by ID: Identifier,
-        within transaction: AnyFDBTransaction? = nil,
+        within transaction: (any FDBTransaction)? = nil,
         snapshot: Bool
     ) async throws -> Self? {
-        let maybeBytes = try await Self.storage.load(
+        let maybeBytes: Bytes? = try await Self.storage.load(
             by: Self.IDAsKey(ID: ID),
             within: transaction,
             snapshot: snapshot
@@ -58,7 +58,7 @@ public extension Entita2FDBEntity {
         
         return try await self.afterLoadRoutines0(
             maybeBytes: maybeBytes,
-            within: transaction as? AnyTransaction
+            within: transaction as? any Entita2Transaction
         )
     }
 
@@ -67,7 +67,7 @@ public extension Entita2FDBEntity {
     static func loadAll(
         bySubspace subspace: FDB.Subspace,
         limit: Int32 = 0,
-        within transaction: AnyFDBTransaction? = nil,
+        within transaction: (any FDBTransaction)? = nil,
         snapshot: Bool
     ) async throws -> [(ID: Self.Identifier, value: Self)] {
         let results = try await Self.storage.loadAll(
@@ -90,7 +90,7 @@ public extension Entita2FDBEntity {
     @inlinable
     static func loadAll(
         limit: Int32 = 0,
-        within transaction: AnyFDBTransaction? = nil,
+        within transaction: (any FDBTransaction)? = nil,
         snapshot: Bool
     ) async throws -> [(ID: Self.Identifier, value: Self)] {
         try await Self.loadAll(
@@ -104,9 +104,9 @@ public extension Entita2FDBEntity {
     /// Loads all entities for given key within a given transaction (optional)
     @inlinable
     static func loadAll(
-        by key: AnyFDBKey,
+        by key: any FDBKey,
         limit: Int32 = 0,
-        within transaction: AnyFDBTransaction? = nil,
+        within transaction: (any FDBTransaction)? = nil,
         snapshot: Bool
     ) async throws -> [(ID: Self.Identifier, value: Self)] {
         try await Self.loadAll(
@@ -125,7 +125,7 @@ public extension Entita2FDBEntity {
         limit: Int32 = 0,
         mode _: FDB.StreamingMode = .wantAll,
         iteration _: Int32 = 1,
-        within transaction: AnyFDBTransaction? = nil,
+        within transaction: (any FDBTransaction)? = nil,
         snapshot: Bool
     ) async throws -> FDB.KeyValuesResult {
         try await Self.storage.loadAll(
@@ -138,20 +138,20 @@ public extension Entita2FDBEntity {
 
     /// Inserts current entity to DB within given transaction
     @inlinable
-    func insert(within transaction: AnyFDBTransaction?, commit: Bool = true) async throws {
-        try await self.insert(within: transaction as? AnyTransaction, commit: commit)
+    func insert(within transaction: (any FDBTransaction)?, commit: Bool = true) async throws {
+        try await self.insert(within: transaction as? any Entita2Transaction, commit: commit)
     }
 
     /// Saves current entity to DB within given transaction
     @inlinable
     func save(
-        by ID: Identifier? = nil, within transaction: AnyFDBTransaction?, commit: Bool = true) async throws {
-        try await self.save(by: ID, within: transaction as? AnyTransaction, commit: commit)
+        by ID: Identifier? = nil, within transaction: (any FDBTransaction)?, commit: Bool = true) async throws {
+        try await self.save(by: ID, within: transaction as? any Entita2Transaction, commit: commit)
     }
 
     /// Deletes current entity from DB within given transaction
     @inlinable
-    func delete(within transaction: AnyFDBTransaction?, commit: Bool = true) async throws {
-        try await self.delete(within: transaction as? AnyTransaction, commit: commit)
+    func delete(within transaction: (any FDBTransaction)?, commit: Bool = true) async throws {
+        try await self.delete(within: transaction as? any Entita2Transaction, commit: commit)
     }
 }

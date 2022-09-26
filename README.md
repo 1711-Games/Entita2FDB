@@ -112,7 +112,7 @@ static func loadAllByIndex(
     key: IndexKey,
     value: FDBTuplePackable,
     limit: Int32 = 0,
-    within tr: AnyFDBTransaction? = nil,
+    within tr: (any FDBTransaction)? = nil,
     snapshot: Bool = false
 ) async throws -> [Self]
 ```
@@ -123,7 +123,7 @@ static func loadAllByIndex(
 static func loadByIndex(
     key: IndexKey,
     value: FDBTuplePackable,
-    within transaction: AnyFDBTransaction? = nil
+    within transaction: (any FDBTransaction)? = nil
 ) async throws -> Self?
 ```
 
@@ -133,7 +133,7 @@ static func loadByIndex(
 static func existsByIndex(
     key: IndexKey,
     value: FDBTuplePackable,
-    within transaction: AnyFDBTransaction? = nil
+    within transaction: (any FDBTransaction)? = nil
 ) async throws -> Bool
 ```
 
@@ -148,7 +148,7 @@ You might've noticed that methods above (as well as generic CRUD methods) accept
 though by default all methods are transactionless (i.e. every request is implicitly transactional under the hood).
 
 In order to execute more than one operation within a transaction, you may create one by
-`let transaction: AnyFDBTransaction = fdb.begin()` and then pass to every CRUD/index method.
+`let transaction: any FDBTransaction = fdb.begin()` and then pass to every CRUD/index method.
 
 Or you may wrap all your routine code with a transaction like this:
 
